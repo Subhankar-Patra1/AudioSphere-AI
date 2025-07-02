@@ -197,7 +197,20 @@ export class GdmLiveAudio extends LitElement {
 
   constructor() {
     super();
-    this.initClient();
+    this.checkApiKeyAndSetError();
+    if (this.userApiKey) {
+      this.initClient();
+    }
+  }
+
+  private checkApiKeyAndSetError() {
+    if (!this.userApiKey) {
+      this.error = this.beautifyError('API key');
+      this.isReady = false;
+    } else {
+      this.error = '';
+      this.isReady = true;
+    }
   }
 
   private initAudio() {
@@ -213,7 +226,10 @@ export class GdmLiveAudio extends LitElement {
   private saveApiKey = () => {
     localStorage.setItem('userApiKey', this.userApiKey);
     this.closeSettings();
-    this.initClient();
+    this.checkApiKeyAndSetError();
+    if (this.userApiKey) {
+      this.initClient();
+    }
   };
 
   private getEffectiveApiKey() {
@@ -230,6 +246,18 @@ export class GdmLiveAudio extends LitElement {
   }
 
   private beautifyError(msg: string): string {
+    if (
+      msg.includes("You exceeded your current quota")
+    ) {
+      return `
+        <div style="color: #fff; background: #c80000; border-radius: 12px; padding: 20px; font-size: 1.1em; box-shadow: 0 2px 16px #000a; max-width: 400px; margin: 24px auto; text-align: center;">
+          <svg xmlns='http://www.w3.org/2000/svg' height='48' width='48' fill='#fff' style='background:#c80000; border-radius:50%; margin-bottom:12px;'><path d='M24 44q-4.15 0-7.8-1.575-3.65-1.575-6.375-4.3Q7.1 35.4 5.525 31.75 3.95 28.1 3.95 23.95q0-4.15 1.575-7.8Q7.1 12.5 9.825 9.775q2.725-2.725 6.375-4.3Q19.85 3.9 24 3.9q4.15 0 7.8 1.575 3.65 1.575 6.375 4.3 2.725 2.725 4.3 6.375Q44.05 19.8 44.05 23.95q0 4.15-1.575 7.8-1.575 3.65-4.3 6.375-2.725 2.725-6.375 4.3Q28.15 44 24 44Zm-2.1-8.05h4.2v-4.2h-4.2Zm0-8.05h4.2v-12.1h-4.2Z'/></svg>
+          <div><b>Quota Exceeded</b></div>
+          <div style='margin-top:8px;'>You have exceeded your current API quota.<br/>Please check your plan and billing details.<br/>
+          <a href='https://aistudio.google.com/app/apikey' target='_blank' rel='noopener noreferrer' style='color: #3b82f6; text-decoration: underline;'>Manage your API key</a></div>
+        </div>
+      `;
+    }
     if (
       msg.includes("Method doesn't allow unregistered callers") ||
       msg.includes('API key') ||
@@ -309,6 +337,10 @@ export class GdmLiveAudio extends LitElement {
           onclose: (e: CloseEvent) => {
             this.updateStatus('Closed: ' + e.reason);
             if (
+              e.reason.includes("You exceeded your current quota")
+            ) {
+              this.updateError(e.reason);
+            } else if (
               e.reason.includes("Method doesn't allow unregistered callers") ||
               e.reason.includes('API key') ||
               e.reason.includes('callers without established identity')
@@ -724,6 +756,7 @@ export class GdmLiveAudio extends LitElement {
   }
 
   render() {
+    const showApiKeyError = !this.userApiKey;
     return html`
       <div>
         <!-- Settings Icon -->
@@ -747,125 +780,128 @@ export class GdmLiveAudio extends LitElement {
             </div>
           </div>
         ` : ''}
-        ${this.identifiedSong ? html`
-          <div id="results-container">
-              <h3>${this.identifiedSong.title}</h3>
-              <p>by ${this.identifiedSong.artist}</p>
-              <div class="links">
-                  <a href=${this.identifiedSong.links.youtube} target="_blank" rel="noopener noreferrer">YouTube</a>
-                  <a href=${this.identifiedSong.links.youtubeMusic} target="_blank" rel="noopener noreferrer">YouTube Music</a>
-                  <a href=${this.identifiedSong.links.spotify} target="_blank" rel="noopener noreferrer">Spotify</a>
-              </div>
-              <button @click=${() => { this.identifiedSong = null; }}>Clear</button>
-          </div>
-        ` : ''}
-        
-        ${this.writtenContent ? html`
-          <div id="write-container">
-            <div class="header">
-              <h4>Generated Content</h4>
-              <div class="header-buttons">
-                <button @click=${this.copyWrittenContent} title="Copy Content">
-                  <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#ffffff"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-720v480-480Z"/></svg>
-                </button>
-                <button @click=${() => { this.writtenContent = null; this.writingError = ''; }} title="Close">
-                  <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#ffffff"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-                </button>
-              </div>
+        ${showApiKeyError ? html`
+          <div style="margin-top: 60px;">${unsafeHTML(this.beautifyError('API key'))}</div>
+        ` : html`
+          ${this.identifiedSong ? html`
+            <div id="results-container">
+                <h3>${this.identifiedSong.title}</h3>
+                <p>by ${this.identifiedSong.artist}</p>
+                <div class="links">
+                    <a href=${this.identifiedSong.links.youtube} target="_blank" rel="noopener noreferrer">YouTube</a>
+                    <a href=${this.identifiedSong.links.youtubeMusic} target="_blank" rel="noopener noreferrer">YouTube Music</a>
+                    <a href=${this.identifiedSong.links.spotify} target="_blank" rel="noopener noreferrer">Spotify</a>
+                </div>
+                <button @click=${() => { this.identifiedSong = null; }}>Clear</button>
             </div>
-            <pre><code>${this.writtenContent}</code></pre>
-          </div>
-        ` : ''}
-
-        <div class="controls">
-          <button
-            id="resetButton"
-            @click=${this.reset}
-            ?disabled=${this.isRecording || this.isIdentifying || this.isWriting}
-            title="Reset Session">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              height="40px"
-              viewBox="0 -960 960 960"
-              width="40px"
-              fill="#ffffff">
-              <path
-                d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z" />
-            </svg>
-          </button>
+          ` : ''}
           
-          <button
-            id="writeButton"
-            @click=${this.handleWriteClick}
-            ?disabled=${this.isRecording || this.isIdentifying}
-            class=${this.isWriting ? 'writing' : ''}
-            title=${this.isWriting ? 'Stop Recording and Generate' : 'Write Content'}>
-              ${this.isWriting ? html`
-                <svg
-                  viewBox="0 0 100 100"
-                  width="32px"
-                  height="32px"
-                  fill="#ffffff"
-                  xmlns="http://www.w3.org/2000/svg">
-                  <rect x="0" y="0" width="100" height="100" rx="15" />
-                </svg>` : html`
-                <svg xmlns="http://www.w3.org/2000/svg" height="40px" viewBox="0 -960 960 960" width="40px" fill="#ffffff"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>
-              `}
-          </button>
+          ${this.writtenContent ? html`
+            <div id="write-container">
+              <div class="header">
+                <h4>Generated Content</h4>
+                <div class="header-buttons">
+                  <button @click=${this.copyWrittenContent} title="Copy Content">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#ffffff"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-720v480-480Z"/></svg>
+                  </button>
+                  <button @click=${() => { this.writtenContent = null; this.writingError = ''; }} title="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#ffffff"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+                  </button>
+                </div>
+              </div>
+              <pre><code>${this.writtenContent}</code></pre>
+            </div>
+          ` : ''}
 
-          <button
-            id="identifyButton"
-            @click=${this.handleIdentifyClick}
-            ?disabled=${this.isRecording || this.isWriting}
-            class=${this.isIdentifying ? 'identifying' : ''}
-            title=${this.isIdentifying ? 'Stop and Identify Song' : 'Identify a Song'}>
-            ${this.isIdentifying
-              ? html`
-                <svg
-                  viewBox="0 0 100 100"
-                  width="32px"
-                  height="32px"
-                  fill="#ffffff"
-                  xmlns="http://www.w3.org/2000/svg">
-                  <rect x="0" y="0" width="100" height="100" rx="15" />
-                </svg>`
-              : html`
-                <svg xmlns="http://www.w3.org/2000/svg" height="40px" viewBox="0 -960 960 960" width="40px" fill="#ffffff">
-                  <path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h480q33 0 56.5 23.5T800-800v320h-80v-320H240v640h200v80H240Zm440-40v-120h-80v-80h80v-120h80v120h80v80h-80v120h-80Z"/>
-                </svg>`
-            }
-          </button>
+          <div class="controls">
+            <button
+              id="resetButton"
+              @click=${this.reset}
+              ?disabled=${this.isRecording || this.isIdentifying || this.isWriting}
+              title="Reset Session">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                height="40px"
+                viewBox="0 -960 960 960"
+                width="40px"
+                fill="#ffffff">
+                <path
+                  d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z" />
+              </svg>
+            </button>
+            
+            <button
+              id="writeButton"
+              @click=${this.handleWriteClick}
+              ?disabled=${this.isRecording || this.isIdentifying}
+              class=${this.isWriting ? 'writing' : ''}
+              title=${this.isWriting ? 'Stop Recording and Generate' : 'Write Content'}>
+                ${this.isWriting ? html`
+                  <svg
+                    viewBox="0 0 100 100"
+                    width="32px"
+                    height="32px"
+                    fill="#ffffff"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <rect x="0" y="0" width="100" height="100" rx="15" />
+                  </svg>` : html`
+                  <svg xmlns="http://www.w3.org/2000/svg" height="40px" viewBox="0 -960 960 960" width="40px" fill="#ffffff"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>
+                `}
+            </button>
 
-          <button
-            id="startButton"
-            @click=${this.startRecording}
-            ?disabled=${!this.isReady || this.isRecording || this.isIdentifying || this.isWriting}
-            title="Start Live Chat">
-            <svg
-              viewBox="0 0 100 100"
-              width="32px"
-              height="32px"
-              fill="#c80000"
-              xmlns="http://www.w3.org/2000/svg">
-              <circle cx="50" cy="50" r="50" />
-            </svg>
-          </button>
-          <button
-            id="stopButton"
-            @click=${this.stopRecording}
-            ?disabled=${!this.isRecording}
-            title="Stop Live Chat">
-            <svg
-              viewBox="0 0 100 100"
-              width="32px"
-              height="32px"
-              fill="#000000"
-              xmlns="http://www.w3.org/2000/svg">
-              <rect x="0" y="0" width="100" height="100" rx="15" />
-            </svg>
-          </button>
-        </div>
+            <button
+              id="identifyButton"
+              @click=${this.handleIdentifyClick}
+              ?disabled=${this.isRecording || this.isWriting}
+              class=${this.isIdentifying ? 'identifying' : ''}
+              title=${this.isIdentifying ? 'Stop and Identify Song' : 'Identify a Song'}>
+              ${this.isIdentifying
+                ? html`
+                  <svg
+                    viewBox="0 0 100 100"
+                    width="32px"
+                    height="32px"
+                    fill="#ffffff"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <rect x="0" y="0" width="100" height="100" rx="15" />
+                  </svg>`
+                : html`
+                  <svg xmlns="http://www.w3.org/2000/svg" height="40px" viewBox="0 -960 960 960" width="40px" fill="#ffffff">
+                    <path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h480q33 0 56.5 23.5T800-800v320h-80v-320H240v640h200v80H240Zm440-40v-120h-80v-80h80v-120h80v120h80v80h-80v120h-80Z"/>
+                  </svg>`
+              }
+            </button>
 
+            <button
+              id="startButton"
+              @click=${this.startRecording}
+              ?disabled=${!this.isReady || this.isRecording || this.isIdentifying || this.isWriting}
+              title="Start Live Chat">
+              <svg
+                viewBox="0 0 100 100"
+                width="32px"
+                height="32px"
+                fill="#c80000"
+                xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="50" />
+              </svg>
+            </button>
+            <button
+              id="stopButton"
+              @click=${this.stopRecording}
+              ?disabled=${!this.isRecording}
+              title="Stop Live Chat">
+              <svg
+                viewBox="0 0 100 100"
+                width="32px"
+                height="32px"
+                fill="#000000"
+                xmlns="http://www.w3.org/2000/svg">
+                <rect x="0" y="0" width="100" height="100" rx="15" />
+              </svg>
+            </button>
+          </div>
+        `}
         <div id="status">
           ${this.writingError || this.identificationError ? (this.writingError || this.identificationError) : this.error ? unsafeHTML(this.error) : this.status}
         </div>
