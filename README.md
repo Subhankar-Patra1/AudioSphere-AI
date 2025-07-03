@@ -84,4 +84,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Google Gemini AI** for the amazing AI capabilities.
 - **LitElement** and **Vite** for the powerful frontend tools.
 
-Enjoy your journey with
+Enjoy your journey.
